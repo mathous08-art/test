@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Programme Musculation - Coaching</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --accent-color: #f43f5e; /* Rose par défaut */
+        }
+        .bg-accent { background-color: var(--accent-color); }
+        .text-accent { color: var(--accent-color); }
+        .border-accent { border-color: var(--accent-color); }
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+    </style>
+</head>
+<body class="bg-[#121212] text-gray-100 font-sans pb-24 select-none">
+
+    <!-- En-tête -->
+    <header class="sticky top-0 z-40 bg-[#181818]/90 backdrop-blur-md border-b border-gray-800 px-4 py-3 flex justify-between items-center">
+        <div>
+            <h1 id="app-title" class="text-xl font-bold tracking-tight text-accent">Bas du Corps A</h1>
+            <p id="app-subtitle" class="text-xs text-gray-400">Semaine 1 • Adaptation</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <span id="global-tonnage" class="text-xs font-semibold bg-gray-800 border border-gray-700 px-2.5 py-1.5 rounded-lg text-emerald-400">0 kg</span>
+        </div>
+    </header>
+
+    <!-- Contenu Principal -->
+    <main id="main-content" class="max-w-md mx-auto p-4 space-y-4">
+        <!-- Dynamiquement injecté par JS -->
+    </main>
+
+    <!-- Chrono Flottant -->
+    <div id="timer-bar" class="fixed bottom-16 left-4 right-4 max-w-md mx-auto bg-gray-900 border border-gray-700 p-3 rounded-2xl shadow-2xl flex items-center justify-between hidden z-50">
+        <div class="flex items-center gap-3">
+            <i data-lucide="timer" class="text-accent animate-pulse"></i>
+            <div>
+                <p class="text-xs text-gray-400">Temps de repos</p>
+                <p id="timer-display" class="text-lg font-bold font-mono text-white">02:30</p>
+            </div>
+        </div>
+        <button onclick="stopTimer()" class="bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded-xl text-xs font-medium">Passer</button>
+    </div>
+
+    <!-- Barre de Navigation Inférieure -->
+    <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-[#181818]/95 backdrop-blur-md border-t border-gray-800 grid grid-cols-4 py-2 px-3 z-40 text-center">
+        <button onclick="switchTab('accueil')" id="nav-accueil" class="flex flex-col items-center text-gray-400 hover:text-white transition">
+            <i data-lucide="home" class="w-5 h-5"></i>
+            <span class="text-[10px] mt-1">Accueil</span>
+        </button>
+        <button onclick="switchTab('seance')" id="nav-seance" class="flex flex-col items-center text-accent transition">
+            <i data-lucide="dumbbell" class="w-5 h-5"></i>
+            <span class="text-[10px] mt-1">Séance</span>
+        </button>
+        <button onclick="switchTab('progression')" id="nav-progression" class="flex flex-col items-center text-gray-400 hover:text-white transition">
+            <i data-lucide="trending-up" class="w-5 h-5"></i>
+            <span class="text-[10px] mt-1">Progression</span>
+        </button>
+        <button onclick="switchTab('reglages')" id="nav-reglages" class="flex flex-col items-center text-gray-400 hover:text-white transition">
+            <i data-lucide="settings" class="w-5 h-5"></i>
+            <span class="text-[10px] mt-1">Réglages</span>
+        </button>
+    </nav>
+
+    <!-- Modal Remplacement Exercice -->
+    <div id="replace-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-gray-900 border border-gray-800 w-full max-w-sm rounded-2xl p-5 space-y-4">
+            <h3 class="font-bold text-base">Remplacer l'exercice</h3>
+            <p class="text-xs text-gray-400">Choisis une suggestion ou tape directement ton exercice personnalisé :</p>
+            <div id="suggestions-list" class="space-y-2 max-h-40 overflow-y-auto"></div>
+            <div class="pt-2 border-t border-gray-800 space-y-2">
+                <input type="text" id="custom-exo-input" placeholder="Ou tape un nom d'exercice..." class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-accent">
+                <div class="flex gap-2">
+                    <button onclick="closeReplaceModal()" class="flex-1 bg-gray-800 py-2 rounded-xl text-xs font-semibold">Annuler</button>
+                    <button onclick="validateCustomReplace()" class="flex-1 bg-accent text-white py-2 rounded-xl text-xs font-semibold">Valider</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script Logique Application -->
+    <script>
+        let currentTab = 'seance';
+        let currentWeek = 1;
+        let currentWorkoutId = 'b1';
+        let accentColor = '#f43f5e';
+        let timerInterval = null;
+        let activeExoIndexForReplace = null;
+
+        // Base de données 10 semaines
+        const weeksData = [
+            { id: 1, name: "Semaine 1 — Adaptation", type: "Adaptation" },
+            { id: 2, name: "Semaine 2 — Adaptation", type: "Adaptation" },
+            { id: 3, name: "Semaine 3 — Adaptation", type: "Adaptation" },
+            { id: 4, name: "Semaine 4 — Accumulation", type: "Accumulation" },
+            { id: 5, name: "Semaine 5 — Accumulation", type: "Accumulation" },
+            { id: 6, name: "Semaine 6 — Accumulation", type: "Accumulation" },
+            { id: 7, name: "Semaine 7 — Intensification", type: "Intensification" },
+            { id: 8, name: "Semaine 8 — Intensification", type: "Intensification" },
+            { id: 9, name: "Semaine 9 — Intensification", type: "Intensification" },
+            { id: 10, name: "Semaine 10 — Décharge", type: "Décharge" }
+        ];
+
+        // Séances adaptées fessiers / haut du corps
+        let workouts = {
+            'b1': {
+                name: "Bas du Corps A",
+                focus: "Grand Fessier & Puissance Lourde",
+                day: "Lundi 5 oct.",
+                exercises: [
+                    { name: "Hip Thrust (Machine ou Barre)", target: "Grand Fessier", setsConfig: "4 × 8-10", rpe: 8, rest: 180, tip: "Pinçage maximal en haut, garder le menton rentré vers la poitrine.", sets: [ {reps: 10, weight: 60, rpe: 8, done: false}, {reps: 10, weight: 65, rpe: 8, done: false}, {reps: 8, weight: 70, rpe: 8.5, done: false}, {reps: 8, weight: 70, rpe: 9, done: false} ] },
+                    { name: "Soulevé de terre roumain (RDL)", target: "Chaîne postérieure", setsConfig: "4 × 10-12", rpe: 8, rest: 150, tip: "Pousser les fesses vers l'arrière, garder les genoux semi-fléchis.", sets: [ {reps: 12, weight: 45, rpe: 8, done: false}, {reps: 10, weight: 50, rpe: 8, done: false}, {reps: 10, weight: 50, rpe: 9, done: false} ] },
+                    { name: "Presse à cuisses (Pieds hauts)", target: "Fessiers & Ischios", setsConfig: "3 × 10-12", rpe: 8, rest: 120, tip: "Pieds haut sur la plateforme et écartés largeur d'épaules.", sets: [ {reps: 12, weight: 80, rpe: 8, done: false}, {reps: 10, weight: 90, rpe: 8.5, done: false}, {reps: 10, weight: 90, rpe: 9, done: false} ] },
+                    { name: "Kickback à la poulie basse", target: "Haut du fessier", setsConfig: "3 × 15", rpe: 9, rest: 90, tip: "Léger buste penché en avant, pousser vers l'arrière et légèrement en diagonale.", sets: [ {reps: 15, weight: 10, rpe: 8, done: false}, {reps: 15, weight: 12.5, rpe: 9, done: false}, {reps: 15, weight: 12.5, rpe: 9, done: false} ] }
+                ]
+            },
+            'h1': {
+                name: "Haut du Corps",
+                focus: "Tonus, Épaules & Dos",
+                day: "Mardi 6 oct.",
+                exercises: [
+                    { name: "Développé militaire assis haltères", target: "Épaules", setsConfig: "3 × 10-12", rpe: 8, rest: 150, tip: "Dossier à 80°, éviter la compensation lombaire.", sets: [ {reps: 12, weight: 10, rpe: 8, done: false}, {reps: 10, weight: 12, rpe: 8.5, done: false}, {reps: 10, weight: 12, rpe: 9, done: false} ] },
+                    { name: "Tirage vertical (Poulie haute)", target: "Grand dorsal", setsConfig: "3 × 10-12", rpe: 8, rest: 90, tip: "Sortir la poitrine, amener la barre vers le haut de la poitrine.", sets: [ {reps: 12, weight: 35, rpe: 8, done: false}, {reps: 10, weight: 40, rpe: 8.5, done: false}, {reps: 10, weight: 40, rpe: 9, done: false} ] },
+                    { name: "Élévations latérales poulie", target: "Deltoïde latéral", setsConfig: "4 × 12-15", rpe: 9, rest: 90, tip: "Coude légèrement fléchi, mouvement contrôlé sans élan.", sets: [ {reps: 15, weight: 5, rpe: 8, done: false}, {reps: 12, weight: 7.5, rpe: 9, done: false}, {reps: 12, weight: 7.5, rpe: 9, done: false} ] }
+                ]
+            },
+            'b2': {
+                name: "Bas du Corps B",
+                focus: "Moyen Fessier & Unilatéral (Bombé)",
+                day: "Vendredi 9 oct.",
+                exercises: [
+                    { name: "Fentes bulgares (buste penché)", target: "Fessier profond", setsConfig: "4 × 10-12", rpe: 8, rest: 150, tip: "Incliner légèrement le buste en avant pour cibler le fessier.", sets: [ {reps: 12, weight: 12, rpe: 8, done: false}, {reps: 10, weight: 14, rpe: 8.5, done: false}, {reps: 10, weight: 14, rpe: 9, done: false} ] },
+                    { name: "Hip Abduction Machine (assise)", target: "Moyen fessier", setsConfig: "4 × 15-20", rpe: 9, rest: 75, tip: "Se pencher en avant pour un recrutement maximal du moyen fessier.", sets: [ {reps: 20, weight: 40, rpe: 8, done: false}, {reps: 18, weight: 45, rpe: 9, done: false}, {reps: 15, weight: 50, rpe: 9.5, done: false} ] },
+                    { name: "Goblet Squat (talons sur cales)", target: "Quadriceps & Fessiers", setsConfig: "3 × 10-12", rpe: 8, rest: 120, tip: "Garder le buste bien droit et descendre profondément.", sets: [ {reps: 12, weight: 16, rpe: 8, done: false}, {reps: 10, weight: 20, rpe: 8.5, done: false}, {reps: 10, weight: 20, rpe: 9, done: false} ] }
+                ]
+            }
+        };
+
+        const suggestionsLibrary = [
+            "Hip Thrust à la machine", "Soulevé de terre roumain haltères", "Fentes bulgares haltères",
+            "Presse à cuisses inclinée", "Hip Abduction Machine", "Leg curl assis", "Kickback poulie basse",
+            "Goblet Squat", "Good Morning élastique", "Extension du bassin au banc"
+        ];
+
+        function init() {
+            lucide.createIcons();
+            renderApp();
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            ['accueil', 'seance', 'progression', 'reglages'].forEach(t => {
+                const btn = document.getElementById(`nav-${t}`);
+                if(t === tab) {
+                    btn.classList.add('text-accent');
+                    btn.classList.remove('text-gray-400');
+                } else {
+                    btn.classList.remove('text-accent');
+                    btn.classList.add('text-gray-400');
+                }
+            });
+            renderApp();
+        }
+
+        function changeWeek(delta) {
+            currentWeek = Math.max(1, Math.min(10, currentWeek + delta));
+            // Logique de progression intelligente : si on change de semaine, on ajuste légèrement les poids selon les RPE précédents
+            if(delta > 0) {
+                applySmartProgression();
+            }
+            renderApp();
+        }
+
+        function selectWorkout(key) {
+            currentWorkoutId = key;
+            switchTab('seance');
+        }
+
+        function applySmartProgression() {
+            Object.keys(workouts).forEach(wKey => {
+                workouts[wKey].exercises.forEach(exo => {
+                    exo.sets.forEach(set => {
+                        if(set.rpe <= 8 && set.reps >= 10) {
+                            set.weight = Number((set.weight + 1.25).toFixed(2)); // Augmentation légère automatique
+                        }
+                    });
+                });
+            });
+        }
+
+        function toggleSetDone(exoIdx, setIdx) {
+            const set = workouts[currentWorkoutId].exercises[exoIdx].sets[setIdx];
+            set.done = !set.done;
+            if(set.done) {
+                startTimer(workouts[currentWorkoutId].exercises[exoIdx].rest);
+            }
+            renderApp();
+        }
+
+        function updateSetVal(exoIdx, setIdx, field, val) {
+            workouts[currentWorkoutId].exercises[exoIdx].sets[setIdx][field] = Number(val);
+            updateTonnage();
+        }
+
+        function startTimer(duration) {
+            clearInterval(timerInterval);
+            let timer = duration;
+            const display = document.getElementById('timer-display');
+            const bar = document.getElementById('timer-bar');
+            bar.classList.remove('hidden');
+
+            timerInterval = setInterval(() => {
+                let minutes = parseInt(timer / 60, 10);
+                let seconds = parseInt(timer % 60, 10);
+                minutes = minutes < 10 ? "0" + minutes : minutes;
+                seconds = seconds < 10 ? "0" + seconds : seconds;
+                display.textContent = minutes + ":" + seconds;
+
+                if (--timer < 0) {
+                    clearInterval(timerInterval);
+                    bar.classList.add('hidden');
+                }
+            }, 1000);
+        }
+
+        function stopTimer() {
+            clearInterval(timerInterval);
+            document.getElementById('timer-bar').classList.add('hidden');
+        }
+
+        function openReplaceModal(exoIdx) {
+            activeExoIndexForReplace = exoIdx;
+            const listContainer = document.getElementById('suggestions-list');
+            listContainer.innerHTML = '';
+            suggestionsLibrary.forEach(s => {
+                const div = document.createElement('div');
+                div.className = "bg-gray-800 hover:bg-gray-700 p-2.5 rounded-xl text-xs cursor-pointer flex justify-between items-center";
+                div.innerHTML = `<span>${s}</span><i data-lucide="plus" class="w-3.5 h-3.5 text-accent"></i>`;
+                div.onclick = () => replaceExerciseWith(s);
+                listContainer.appendChild(div);
+            });
+            lucide.createIcons();
+            document.getElementById('replace-modal').classList.remove('hidden');
+        }
+
+        function closeReplaceModal() {
+            document.getElementById('replace-modal').classList.add('hidden');
+            document.getElementById('custom-exo-input').value = '';
+        }
+
+        function replaceExerciseWith(newName) {
+            if(activeExoIndexForReplace !== null) {
+                workouts[currentWorkoutId].exercises[activeExoIndexForReplace].name = newName;
+                workouts[currentWorkoutId].exercises[activeExoIndexForReplace].target = "Personnalisé";
+                closeReplaceModal();
+                renderApp();
+            }
+        }
+
+        function validateCustomReplace() {
+            const customVal = document.getElementById('custom-exo-input').value.trim();
+            if(customVal) {
+                replaceExerciseWith(customVal);
+            }
+        }
+
+        function updateTonnage() {
+            let total = 0;
+            const currentW = workouts[currentWorkoutId];
+            currentW.exercises.forEach(exo => {
+                exo.sets.forEach(set => {
+                    if(set.done) total += (set.weight * set.reps);
+                });
+            });
+            document.getElementById('global-tonnage').textContent = `+${total.toLocaleString()} kg`;
+        }
+
+        function changeAccentColor(color) {
+            accentColor = color;
+            document.documentElement.style.setProperty('--accent-color', color);
+            renderApp();
+        }
+
+        function renderApp() {
+            const main = document.getElementById('main-content');
+            const currentW = workouts[currentWorkoutId];
+            
+            document.getElementById('app-title').textContent = currentW.name;
+            document.getElementById('app-subtitle').textContent = `Semaine ${currentWeek} • ${weeksData[currentWeek-1].type}`;
+            updateTonnage();
+
+            main.innerHTML = '';
+
+            if(currentTab === 'accueil') {
+                main.innerHTML = `
+                    <div class="space-y-4">
+                        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-3">
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs font-semibold text-accent uppercase tracking-wider">${weeksData[currentWeek-1].name}</span>
+                                <div class="flex gap-1">
+                                    <button onclick="changeWeek(-1)" class="bg-gray-800 px-2.5 py-1 rounded-lg text-xs font-bold">&larr;</button>
+                                    <button onclick="changeWeek(1)" class="bg-gray-800 px-2.5 py-1 rounded-lg text-xs font-bold">&rarr;</button>
+                                </div>
+                            </div>
+                            <p class="text-xs text-gray-400">Progression intelligente active : les charges s'adaptent automatiquement selon le RPE validé la semaine précédente.</p>
+                        </div>
+                        <h3 class="text-sm font-bold text-gray-300">Les Séances de la Semaine</h3>
+                        <div class="space-y-3">
+                            <div onclick="selectWorkout('b1')" class="bg-gray-900 border border-gray-800 p-4 rounded-2xl cursor-pointer hover:border-gray-700 transition space-y-1">
+                                <div class="flex justify-between"><span class="font-bold text-sm">Bas du Corps A</span><span class="text-xs text-accent">Lundi</span></div>
+                                <p class="text-xs text-gray-400">Grand Fessier & Puissance Lourde</p>
+                            </div>
+                            <div onclick="selectWorkout('h1')" class="bg-gray-900 border border-gray-800 p-4 rounded-2xl cursor-pointer hover:border-gray-700 transition space-y-1">
+                                <div class="flex justify-between"><span class="font-bold text-sm">Haut du Corps</span><span class="text-xs text-accent">Mardi</span></div>
+                                <p class="text-xs text-gray-400">Tonus, Épaules & Dos</p>
+                            </div>
+                            <div onclick="selectWorkout('b2')" class="bg-gray-900 border border-gray-800 p-4 rounded-2xl cursor-pointer hover:border-gray-700 transition space-y-1">
+                                <div class="flex justify-between"><span class="font-bold text-sm">Bas du Corps B</span><span class="text-xs text-accent">Vendredi</span></div>
+                                <p class="text-xs text-gray-400">Moyen Fessier & Unilatéral (Bombé)</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else if(currentTab === 'seance') {
+                let html = `
+                    <div class="flex bg-gray-900 p-1 rounded-xl mb-4 border border-gray-800">
+                        <button onclick="selectWorkout('b1')" class="flex-1 py-2 text-xs font-semibold rounded-lg ${currentWorkoutId==='b1'?'bg-accent text-white':'text-gray-400'}">Bas A</button>
+                        <button onclick="selectWorkout('h1')" class="flex-1 py-2 text-xs font-semibold rounded-lg ${currentWorkoutId==='h1'?'bg-accent text-white':'text-gray-400'}">Haut</button>
+                        <button onclick="selectWorkout('b2')" class="flex-1 py-2 text-xs font-semibold rounded-lg ${currentWorkoutId==='b2'?'bg-accent text-white':'text-gray-400'}">Bas B</button>
+                    </div>
+                `;
+
+                currentW.exercises.forEach((exo, exoIdx) => {
+                    html += `
+                        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-3 mb-4">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="text-xs text-accent font-semibold">${exoIdx + 1} • ${exo.target}</p>
+                                    <h3 class="font-bold text-sm text-white">${exo.name}</h3>
+                                </div>
+                                <button onclick="openReplaceModal(${exoIdx})" class="text-gray-400 hover:text-white p-1"><i data-lucide="refresh-cw" class="w-4 h-4"></i></button>
+                            </div>
+                            <div class="flex gap-2 flex-wrap text-xs">
+                                <span class="bg-gray-800 px-2.5 py-1 rounded-lg text-gray-300 font-mono">${exo.setsConfig}</span>
+                                <span class="bg-gray-800 px-2.5 py-1 rounded-lg text-gray-300 font-mono">RPE ${exo.rpe}</span>
+                                <span class="bg-gray-800 px-2.5 py-1 rounded-lg text-gray-300 font-mono">Repos ${exo.rest/60}min</span>
+                            </div>
+                            <p class="text-xs text-gray-400 italic bg-gray-950/40 p-2 rounded-xl border border-gray-800/50">${exo.tip}</p>
+                            
+                            <div class="space-y-2 pt-2 border-t border-gray-800">
+                    `;
+
+                    exo.sets.forEach((set, setIdx) => {
+                        html += `
+                            <div class="flex items-center justify-between bg-gray-950/60 p-2.5 rounded-xl border border-gray-800/80">
+                                <span class="text-xs text-gray-400 font-semibold w-12">Série ${setIdx + 1}</span>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" value="${set.reps}" onchange="updateSetVal(${exoIdx}, ${setIdx}, 'reps', this.value)" class="w-12 bg-gray-800 text-center rounded-lg py-1 text-xs font-mono font-bold focus:outline-none focus:border-accent">
+                                    <span class="text-xs text-gray-500">reps</span>
+                                    <input type="number" step="0.5" value="${set.weight}" onchange="updateSetVal(${exoIdx}, ${setIdx}, 'weight', this.value)" class="w-14 bg-gray-800 text-center rounded-lg py-1 text-xs font-mono font-bold focus:outline-none focus:border-accent">
+                                    <span class="text-xs text-gray-500">kg</span>
+                                </div>
+                                <button onclick="toggleSetDone(${exoIdx}, ${setIdx})" class="w-7 h-7 rounded-lg flex items-center justify-center ${set.done ? 'bg-emerald-500 text-black font-bold' : 'bg-gray-800 text-gray-400'}">
+                                    <i data-lucide="check" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        `;
+                    });
+
+                    html += `</div></div>`;
+                });
+
+                main.innerHTML = html;
+            } else if(currentTab === 'progression') {
+                main.innerHTML = `
+                    <div class="space-y-4">
+                        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-2">
+                            <h3 class="font-bold text-sm">Volume Global de la Semaine</h3>
+                            <p class="text-2xl font-black text-accent" id="progression-tonnage">Chargement...</p>
+                            <p class="text-xs text-gray-400">Calculé en temps réel sur les séries validées avec le chronomètre.</p>
+                        </div>
+                    </div>
+                `;
+            } else if(currentTab === 'reglages') {
+                main.innerHTML = `
+                    <div class="space-y-4">
+                        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-3">
+                            <h3 class="font-bold text-sm">Personnalisation des couleurs</h3>
+                            <p class="text-xs text-gray-400">Choisis la couleur de l'interface pour ta copine :</p>
+                            <div class="flex gap-3 pt-2">
+                                <button onclick="changeAccentColor('#f43f5e')" class="w-8 h-8 rounded-full bg-rose-500 ring-2 ring-offset-2 ring-offset-gray-900 ring-rose-500"></button>
+                                <button onclick="changeAccentColor('#ec4899')" class="w-8 h-8 rounded-full bg-pink-500"></button>
+                                <button onclick="changeAccentColor('#8b5cf6')" class="w-8 h-8 rounded-full bg-purple-500"></button>
+                                <button onclick="changeAccentColor('#3b82f6')" class="w-8 h-8 rounded-full bg-blue-500"></button>
+                                <button onclick="changeAccentColor('#10b981')" class="w-8 h-8 rounded-full bg-emerald-500"></button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            lucide.createIcons();
+            updateTonnage();
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
